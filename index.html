@@ -61,6 +61,34 @@
     50%{box-shadow:0 0 0 6px rgba(87,214,141,0);}
   }
 
+  .header-actions{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+  .demo-btn{
+    background:var(--temp); color:#2A1104; border:none; border-radius:8px;
+    padding:10px 18px; font-weight:600; font-size:13px; cursor:pointer;
+    font-family:'IBM Plex Sans', sans-serif;
+    box-shadow:0 0 0 0 rgba(255,138,91,0.5);
+    animation:glow 2.2s ease-in-out infinite;
+  }
+  @keyframes glow{
+    0%,100%{box-shadow:0 0 0 0 rgba(255,138,91,0.35);}
+    50%{box-shadow:0 0 0 7px rgba(255,138,91,0);}
+  }
+  .demo-btn:hover{filter:brightness(1.08);}
+  .demo-btn.secondary{
+    background:var(--hum); color:#06231F; animation:none; box-shadow:none;
+  }
+
+  .demo-banner{
+    display:none;
+    background:rgba(255,138,91,0.1); border:1px solid rgba(255,138,91,0.3);
+    color:var(--text); font-size:13px; line-height:1.6;
+    padding:12px 16px; border-radius:10px; margin-bottom:20px;
+  }
+  .demo-banner.show{display:block;}
+  .demo-banner strong{color:var(--temp);}
+  .demo-banner a{color:var(--hum); font-weight:600; margin-left:6px; text-decoration:none;}
+  .demo-banner a:hover{text-decoration:underline;}
+
   .settings{
     background:var(--panel); border:1px solid var(--border); border-radius:12px;
     padding:16px 20px; margin-bottom:24px;
@@ -142,13 +170,20 @@
       <div class="eyebrow">Telemetry / Live</div>
       <h1>Environment Monitor</h1>
     </div>
-    <div class="status" id="statusBadge">
-      <span class="dot" id="statusDot"></span>
-      <span id="statusText">Not connected</span>
+    <div class="header-actions">
+      <button id="actionBtn" class="demo-btn">Try without sign-in →</button>
+      <div class="status" id="statusBadge">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Not connected</span>
+      </div>
     </div>
   </header>
 
-  <details class="settings" open id="settingsPanel">
+  <div class="demo-banner" id="demoBanner">
+    You're viewing <strong>simulated demo data</strong>, refreshing every 3 seconds — this is exactly what it looks like connected to a real device.
+  </div>
+
+  <details class="settings" id="settingsPanel">
     <summary>ADAFRUIT IO CONNECTION</summary>
     <div class="settings-grid">
       <input type="text" id="usernameInput" placeholder="Adafruit IO username">
@@ -158,7 +193,6 @@
     <div class="settings-note">
       Your username and key are used only in this browser tab to call the Adafruit IO API directly — they are never stored or sent anywhere else.
       Get them from io.adafruit.com after creating the <code>temperature</code>, <code>humidity</code> and <code>light</code> feeds (see Step 2 of the guide).
-      No account handy? <a href="#" id="demoLink" style="color:var(--hum);">View with simulated demo data instead →</a>
     </div>
   </details>
 
@@ -285,10 +319,16 @@ document.getElementById('connectBtn').addEventListener('click', () => {
     return;
   }
   document.getElementById('settingsPanel').open = false;
+  document.getElementById('demoBanner').classList.remove('show');
   setStatus('', 'Connecting…');
   if (pollTimer) clearInterval(pollTimer);
   poll();
   pollTimer = setInterval(poll, 10000);
+
+  const btn = document.getElementById('actionBtn');
+  btn.textContent = 'Try without sign-in →';
+  btn.classList.remove('secondary');
+  btn.onclick = startDemo;
 });
 
 // ---------- DEMO MODE (simulated data, no credentials needed) ----------
@@ -328,13 +368,26 @@ function runDemoTick() {
   footerNote.textContent = `Simulated data, updates every 3s — this is what the dashboard looks like connected to a real device.`;
 }
 
-document.getElementById('demoLink').addEventListener('click', (e) => {
-  e.preventDefault();
-  document.getElementById('settingsPanel').open = false;
+function startDemo() {
+  document.getElementById('demoBanner').classList.add('show');
   if (pollTimer) clearInterval(pollTimer);
   runDemoTick();
   pollTimer = setInterval(runDemoTick, 3000);
-});
+
+  const btn = document.getElementById('actionBtn');
+  btn.textContent = 'Connect your own account →';
+  btn.classList.add('secondary');
+  btn.onclick = () => {
+    document.getElementById('demoBanner').classList.remove('show');
+    if (pollTimer) clearInterval(pollTimer);
+    setStatus('', 'Not connected');
+    footerNote.textContent = 'Enter your Adafruit IO credentials above and click Connect to start streaming.';
+    document.getElementById('settingsPanel').open = true;
+    document.getElementById('settingsPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+}
+
+document.getElementById('actionBtn').addEventListener('click', startDemo);
 </script>
 </body>
 </html>
