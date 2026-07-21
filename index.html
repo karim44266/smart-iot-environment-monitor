@@ -158,6 +158,7 @@
     <div class="settings-note">
       Your username and key are used only in this browser tab to call the Adafruit IO API directly — they are never stored or sent anywhere else.
       Get them from io.adafruit.com after creating the <code>temperature</code>, <code>humidity</code> and <code>light</code> feeds (see Step 2 of the guide).
+      No account handy? <a href="#" id="demoLink" style="color:var(--hum);">View with simulated demo data instead →</a>
     </div>
   </details>
 
@@ -288,6 +289,51 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   if (pollTimer) clearInterval(pollTimer);
   poll();
   pollTimer = setInterval(poll, 10000);
+});
+
+// ---------- DEMO MODE (simulated data, no credentials needed) ----------
+let demoState = { temp: 23, hum: 45, light: 60 };
+const demoLabels = [];
+const demoTemp = [], demoHum = [], demoLight = [];
+
+function randomWalk(value, min, max, step) {
+  value += (Math.random() - 0.5) * step;
+  return Math.max(min, Math.min(max, value));
+}
+
+function runDemoTick() {
+  demoState.temp = randomWalk(demoState.temp, 15, 32, 1.2);
+  demoState.hum = randomWalk(demoState.hum, 30, 70, 3);
+  demoState.light = randomWalk(demoState.light, 10, 95, 6);
+
+  const label = new Date().toLocaleTimeString();
+  demoLabels.push(label); demoTemp.push(demoState.temp);
+  demoHum.push(demoState.hum); demoLight.push(demoState.light);
+  if (demoLabels.length > 20) { demoLabels.shift(); demoTemp.shift(); demoHum.shift(); demoLight.shift(); }
+
+  document.getElementById('tempValue').innerHTML = `${demoState.temp.toFixed(1)}<span class="unit">°C</span>`;
+  document.getElementById('humValue').innerHTML = `${demoState.hum.toFixed(1)}<span class="unit">%</span>`;
+  document.getElementById('lightValue').innerHTML = `${demoState.light.toFixed(0)}<span class="unit">%</span>`;
+  document.getElementById('tempUpdated').textContent = 'just now';
+  document.getElementById('humUpdated').textContent = 'just now';
+  document.getElementById('lightUpdated').textContent = 'just now';
+
+  chart.data.labels = [...demoLabels];
+  chart.data.datasets[0].data = [...demoTemp];
+  chart.data.datasets[1].data = [...demoHum];
+  chart.data.datasets[2].data = [...demoLight];
+  chart.update('none');
+
+  setStatus('live', 'Demo mode — simulated data');
+  footerNote.textContent = `Simulated data, updates every 3s — this is what the dashboard looks like connected to a real device.`;
+}
+
+document.getElementById('demoLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('settingsPanel').open = false;
+  if (pollTimer) clearInterval(pollTimer);
+  runDemoTick();
+  pollTimer = setInterval(runDemoTick, 3000);
 });
 </script>
 </body>
