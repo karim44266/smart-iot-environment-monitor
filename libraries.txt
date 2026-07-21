@@ -1,0 +1,4 @@
+# Wokwi Library Manager
+# One library name per line, Wokwi will fetch it automatically
+DHT sensor library
+Adafruit Unified Sensor

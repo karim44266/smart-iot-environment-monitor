@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Environment Monitor — Live Telemetry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0B1220;
+    --panel:#131B2E;
+    --panel-alt:#182238;
+    --border:rgba(255,255,255,0.08);
+    --text:#E8EDF5;
+    --muted:#7C8AA5;
+    --temp:#FF8A5B;
+    --hum:#4FD1C5;
+    --light:#F5C542;
+    --danger:#FF5C5C;
+    --good:#57D68D;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% 0%, rgba(79,209,197,0.06), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(255,138,91,0.06), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans', sans-serif;
+    min-height:100vh;
+    padding:32px 24px 64px;
+  }
+  .wrap{max-width:1040px; margin:0 auto;}
+
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    flex-wrap:wrap; gap:16px;
+    margin-bottom:28px;
+    padding-bottom:20px;
+    border-bottom:1px solid var(--border);
+  }
+  .title-block .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px; letter-spacing:0.18em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:6px;
+  }
+  h1{font-size:26px; font-weight:600; letter-spacing:-0.01em;}
+  .status{
+    display:flex; align-items:center; gap:10px;
+    font-family:'IBM Plex Mono', monospace; font-size:13px; color:var(--muted);
+    background:var(--panel); border:1px solid var(--border);
+    padding:8px 14px; border-radius:8px;
+  }
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0;}
+  .dot.live{background:var(--good); animation:pulse 1.8s ease-in-out infinite;}
+  .dot.err{background:var(--danger);}
+  @keyframes pulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(87,214,141,0.5);}
+    50%{box-shadow:0 0 0 6px rgba(87,214,141,0);}
+  }
+
+  .settings{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:16px 20px; margin-bottom:24px;
+  }
+  .settings summary{cursor:pointer; font-size:13px; color:var(--muted); font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em;}
+  .settings summary::marker{color:var(--muted);}
+  .settings-grid{
+    display:grid; grid-template-columns:1fr 1fr auto; gap:12px; margin-top:14px;
+  }
+  .settings-grid input{
+    background:var(--panel-alt); border:1px solid var(--border); color:var(--text);
+    padding:10px 12px; border-radius:8px; font-family:'IBM Plex Mono', monospace; font-size:13px;
+    outline:none;
+  }
+  .settings-grid input:focus{border-color:var(--hum);}
+  .settings-grid button{
+    background:var(--hum); color:#06231F; border:none; border-radius:8px;
+    padding:10px 20px; font-weight:600; cursor:pointer; font-family:'IBM Plex Sans',sans-serif;
+    font-size:13px;
+  }
+  .settings-note{font-size:12px; color:var(--muted); margin-top:10px; line-height:1.5;}
+
+  .gauges{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:24px;
+  }
+  .gauge{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:20px; position:relative; overflow:hidden;
+  }
+  .gauge::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:3px;
+  }
+  .gauge.temp::before{background:var(--temp);}
+  .gauge.hum::before{background:var(--hum);}
+  .gauge.light::before{background:var(--light);}
+  .gauge .label{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:10px;
+  }
+  .gauge .value{
+    font-family:'IBM Plex Mono', monospace; font-size:42px; font-weight:600; line-height:1;
+  }
+  .gauge.temp .value{color:var(--temp);}
+  .gauge.hum .value{color:var(--hum);}
+  .gauge.light .value{color:var(--light);}
+  .gauge .unit{font-size:16px; color:var(--muted); font-weight:400; margin-left:4px;}
+  .gauge .updated{font-size:11px; color:var(--muted); margin-top:10px; font-family:'IBM Plex Mono', monospace;}
+
+  .chart-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:22px; margin-bottom:20px;
+  }
+  .chart-card .label{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:16px;
+  }
+  .chart-wrap{height:280px; position:relative;}
+
+  .empty{
+    text-align:center; color:var(--muted); font-size:13px; padding:40px 20px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  footer{
+    text-align:center; color:var(--muted); font-size:12px; margin-top:20px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  @media (max-width:720px){
+    .gauges{grid-template-columns:1fr;}
+    .settings-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="title-block">
+      <div class="eyebrow">Telemetry / Live</div>
+      <h1>Environment Monitor</h1>
+    </div>
+    <div class="status" id="statusBadge">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Not connected</span>
+    </div>
+  </header>
+
+  <details class="settings" open id="settingsPanel">
+    <summary>ADAFRUIT IO CONNECTION</summary>
+    <div class="settings-grid">
+      <input type="text" id="usernameInput" placeholder="Adafruit IO username">
+      <input type="password" id="keyInput" placeholder="Adafruit IO AIO Key">
+      <button id="connectBtn">Connect</button>
+    </div>
+    <div class="settings-note">
+      Your username and key are used only in this browser tab to call the Adafruit IO API directly — they are never stored or sent anywhere else.
+      Get them from io.adafruit.com after creating the <code>temperature</code>, <code>humidity</code> and <code>light</code> feeds (see Step 2 of the guide).
+    </div>
+  </details>
+
+  <div class="gauges">
+    <div class="gauge temp">
+      <div class="label">Temperature</div>
+      <div class="value" id="tempValue">--<span class="unit">°C</span></div>
+      <div class="updated" id="tempUpdated">waiting for data</div>
+    </div>
+    <div class="gauge hum">
+      <div class="label">Humidity</div>
+      <div class="value" id="humValue">--<span class="unit">%</span></div>
+      <div class="updated" id="humUpdated">waiting for data</div>
+    </div>
+    <div class="gauge light">
+      <div class="label">Light level</div>
+      <div class="value" id="lightValue">--<span class="unit">%</span></div>
+      <div class="updated" id="lightUpdated">waiting for data</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="label">Last 20 readings</div>
+    <div class="chart-wrap">
+      <canvas id="liveChart"></canvas>
+    </div>
+  </div>
+
+  <footer id="footerNote">Enter your Adafruit IO credentials above and click Connect to start streaming.</footer>
+
+</div>
+
+<script>
+let USERNAME = "";
+let AIO_KEY = "";
+let pollTimer = null;
+
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const footerNote = document.getElementById('footerNote');
+
+const ctx = document.getElementById('liveChart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'Temperature (°C)', data: [], borderColor: '#FF8A5B', backgroundColor: 'rgba(255,138,91,0.08)', tension: 0.35, pointRadius: 0, borderWidth: 2, fill: true },
+      { label: 'Humidity (%)', data: [], borderColor: '#4FD1C5', backgroundColor: 'rgba(79,209,197,0.08)', tension: 0.35, pointRadius: 0, borderWidth: 2, fill: true },
+      { label: 'Light (%)', data: [], borderColor: '#F5C542', backgroundColor: 'rgba(245,197,66,0.06)', tension: 0.35, pointRadius: 0, borderWidth: 2, fill: true }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { labels: { color: '#7C8AA5', font: { family: 'IBM Plex Mono', size: 11 } } }
+    },
+    scales: {
+      x: { ticks: { color: '#7C8AA5', font: { family: 'IBM Plex Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      y: { ticks: { color: '#7C8AA5', font: { family: 'IBM Plex Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+  }
+});
+
+function setStatus(state, text) {
+  statusDot.className = 'dot' + (state === 'live' ? ' live' : state === 'err' ? ' err' : '');
+  statusText.textContent = text;
+}
+
+async function fetchFeed(feedKey) {
+  const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${feedKey}/data?limit=20`;
+  const res = await fetch(url, { headers: { 'X-AIO-Key': AIO_KEY } });
+  if (!res.ok) throw new Error(`Feed "${feedKey}" request failed (${res.status})`);
+  return res.json();
+}
+
+function timeAgo(iso) {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  return `${Math.floor(secs / 60)}m ago`;
+}
+
+async function poll() {
+  try {
+    const [temp, hum, light] = await Promise.all([
+      fetchFeed('temperature'), fetchFeed('humidity'), fetchFeed('light')
+    ]);
+
+    if (temp.length) {
+      document.getElementById('tempValue').innerHTML = `${parseFloat(temp[0].value).toFixed(1)}<span class="unit">°C</span>`;
+      document.getElementById('tempUpdated').textContent = timeAgo(temp[0].created_at);
+    }
+    if (hum.length) {
+      document.getElementById('humValue').innerHTML = `${parseFloat(hum[0].value).toFixed(1)}<span class="unit">%</span>`;
+      document.getElementById('humUpdated').textContent = timeAgo(hum[0].created_at);
+    }
+    if (light.length) {
+      document.getElementById('lightValue').innerHTML = `${parseFloat(light[0].value).toFixed(0)}<span class="unit">%</span>`;
+      document.getElementById('lightUpdated').textContent = timeAgo(light[0].created_at);
+    }
+
+    const ordered = [...temp].reverse();
+    chart.data.labels = ordered.map(d => new Date(d.created_at).toLocaleTimeString());
+    chart.data.datasets[0].data = ordered.map(d => parseFloat(d.value));
+    chart.data.datasets[1].data = [...hum].reverse().map(d => parseFloat(d.value));
+    chart.data.datasets[2].data = [...light].reverse().map(d => parseFloat(d.value));
+    chart.update('none');
+
+    setStatus('live', 'Live');
+    footerNote.textContent = `Last refresh: ${new Date().toLocaleTimeString()} — polling every 10s`;
+  } catch (err) {
+    setStatus('err', 'Connection error');
+    footerNote.textContent = err.message;
+  }
+}
+
+document.getElementById('connectBtn').addEventListener('click', () => {
+  USERNAME = document.getElementById('usernameInput').value.trim();
+  AIO_KEY = document.getElementById('keyInput').value.trim();
+  if (!USERNAME || !AIO_KEY) {
+    setStatus('err', 'Missing credentials');
+    return;
+  }
+  document.getElementById('settingsPanel').open = false;
+  setStatus('', 'Connecting…');
+  if (pollTimer) clearInterval(pollTimer);
+  poll();
+  pollTimer = setInterval(poll, 10000);
+});
+</script>
+</body>
+</html>
